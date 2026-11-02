@@ -44,7 +44,10 @@ function amount(value, allowZero = false) {
 }
 function date(value) {
   const s = text(value, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || Number.isNaN(Date.parse(s + 'T12:00:00'))) throw new Error('תאריך לא תקין');
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(s)) throw new Error('תאריך לא תקין');
+  const [y,m,d] = s.split('-').map(Number);
+  const check = new Date(y,m-1,d);
+  if (check.getFullYear() !== y || check.getMonth() !== m-1 || check.getDate() !== d) throw new Error('תאריך לא תקין');
   return s;
 }
 function initDatabase() {
