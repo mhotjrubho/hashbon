@@ -154,6 +154,22 @@ ipcMain.handle('transactions:update', (_e, item = {}) => {
   ]);
   saveDatabase(); return { success: true };
 });
+ipcMain.handle('transactions:export', async (_e, filters = {}) => {
+  const clauses = [];
+  const params = [];
+  if (filters.type && ['income','expense','reimbursement'].includes(filters.type)) { clauses.push('type=?'); params.push(filters.type); }
+  if (filters.month && /^\\d{4}-\\d{2}$/.test(String(filters.month))) { clauses.push("substr(transaction_date,1,7)=?"); params.push(String(filters.month)); }
+  if (filters.search) { clauses.push('(title LIKE ? OR category LIKE ? OR notes LIKE ?)'); const q='%' + text(filters.search,100) + '%'; params.push(q,q,q); }
+  const data=rows('SELECT transaction_date,title,category,type,amount,notes FROM transactions '+(clauses.length?'WHERE '+clauses.join(' AND '):'')+' ORDER BY transaction_date DESC,id DESC',params);
+  const picked=await dialog.showSaveDialog(mainWindow,{title:'ייצוא תנועות לקובץ CSV',defaultPath:'hashbon-transactions.csv',filters:[{name:'קובץ CSV',extensions:['csv']}]});
+  if(picked.canceled||!picked.filePath)return {canceled:true};
+  const headers=['תאריך','תיאור','קטגוריה','סוג','סכום','הערות'];
+  const labels={income:'הכנסה',expense:'הוצאה',reimbursement:'החזר'};
+  const cell=value=>'"'+String(value??'').replace(/"/g,'""')+'"';
+  const lines=[headers,...data.map(x=>[x.transaction_date,x.title,x.category,labels[x.type]||x.type,x.amount,x.notes])].map(row=>row.map(cell).join(','));
+  fs.writeFileSync(picked.filePath,'\\uFEFF'+lines.join('\\r\\n'),'utf8');
+  return {success:true,path:picked.filePath,count:data.length};
+});
 ipcMain.handle('transactions:remove', (_e, id) => {
   db.run('DELETE FROM transactions WHERE id=?', [validId(id)]); saveDatabase(); return { success: true };
 });
