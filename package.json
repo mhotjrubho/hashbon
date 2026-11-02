@@ -1,6 +1,6 @@
 {
-  "name": "cheshbon-local",
-  "version": "0.1.0",
+  "name": "hashbon",
+  "version": "1.0.0",
   "private": true,
   "description": "חשבון - מערכת מקומית לניהול כספים אישיים, שעות עבודה ותלושי שכר",
   "main": "electron/main.cjs",
