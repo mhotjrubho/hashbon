@@ -1,4 +1,4 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {LayoutDashboard,ArrowLeftRight,BriefcaseBusiness,FileText,PieChart,Settings as SettingsIcon,Wallet,TrendingUp,TrendingDown,ReceiptText,Plus,Search,CalendarDays,ShieldCheck,Trash2,Pencil,Upload,Download,RefreshCw,Timer,Banknote,Check,X,ExternalLink} from 'lucide-react';
 const nav=[['dashboard','סקירה כללית',LayoutDashboard],['transactions','תנועות כספיות',ArrowLeftRight],['work','שעות עבודה',BriefcaseBusiness],['payslips','תלושי שכר',FileText],['reports','דוחות וסיכומים',PieChart],['settings','הגדרות וגיבוי',SettingsIcon]];
 const money=v=>new Intl.NumberFormat('he-IL',{style:'currency',currency:'ILS',maximumFractionDigits:2}).format(Number(v||0));
@@ -8,13 +8,14 @@ const monthName=m=>{const [year,month]=String(m||thisMonth()).split('-');return 
 const dateLabel=value=>{if(!value)return '—';const [y,m,d]=String(value).split('-');return `${d}/${m}/${y}`};
 export default function App(){
  const [page,setPage]=useState('dashboard'),[month,setMonth]=useState(thisMonth()),[dash,setDash]=useState(null),[tx,setTx]=useState([]),[work,setWork]=useState([]),[slips,setSlips]=useState([]),[settings,setSettings]=useState({}),[busy,setBusy]=useState(true),[modal,setModal]=useState(''),[edit,setEdit]=useState(null),[toast,setToast]=useState(''),[search,setSearch]=useState(''),[filter,setFilter]=useState('all');
+ const refreshVersion=useRef(0);
  const notify=s=>{setToast(s);setTimeout(()=>setToast(''),3000)};
- async function refresh(){try{const [d,t,w,p,s]=await Promise.all([window.cheshbon.dashboard(month),window.cheshbon.transactions.list({month,search}),window.cheshbon.work.list({month}),window.cheshbon.payslips.list(),window.cheshbon.settings.get()]);setDash(d);setTx(t);setWork(w);setSlips(p);setSettings(s)}catch(e){notify(e.message)}finally{setBusy(false)}}
+ async function refresh(){const version=++refreshVersion.current;try{const [d,t,w,p,s]=await Promise.all([window.cheshbon.dashboard(month),window.cheshbon.transactions.list({month,search}),window.cheshbon.work.list({month}),window.cheshbon.payslips.list(),window.cheshbon.settings.get()]);if(version!==refreshVersion.current)return;setDash(d);setTx(t);setWork(w);setSlips(p);setSettings(s)}catch(e){if(version===refreshVersion.current)notify(e.message)}finally{if(version===refreshVersion.current)setBusy(false)}}
  useEffect(()=>{refresh()},[month,search]);
  const hours=work.reduce((a,x)=>a+Number(x.hours),0),estimate=work.reduce((a,x)=>a+Number(x.hours)*Number(x.hourly_rate),0);
 
- async function saveTx(v){try{if(edit)await window.cheshbon.transactions.update({...v,id:edit.id});else await window.cheshbon.transactions.add(v);setModal('');setEdit(null);notify('התנועה נשמרה');refresh()}catch(e){notify(e.message)}}
- async function saveWork(v){try{await window.cheshbon.work.add(v);setModal('');notify('השעות נשמרו');refresh()}catch(e){notify(e.message)}}
+ async function saveTx(v){try{if(edit)await window.cheshbon.transactions.update({...v,id:edit.id});else await window.cheshbon.transactions.add(v);setModal('');setEdit(null);notify('התנועה נשמרה');await refresh()}catch(e){notify(e.message)}}
+ async function saveWork(v){try{await window.cheshbon.work.add(v);setModal('');notify('השעות נשמרו');await refresh()}catch(e){notify(e.message)}}
  async function importSlip(){try{const v=await window.cheshbon.payslips.import();if(v){await refresh();const all=await window.cheshbon.payslips.list();setEdit(all.find(x=>x.id===v.id)||v);setModal('slip');notify('התלוש נוסף. יש להשלים את פרטי השכר ולשמור.')}}catch(e){notify(e.message)}}
  async function del(kind,id){if(!confirm('למחוק את הרשומה?'))return;try{await window.cheshbon[kind].remove(id);notify('נמחק');refresh()}catch(e){notify(e.message)}}
  const filtered=tx.filter(x=>filter==='all'||x.type===filter);
@@ -31,7 +32,7 @@ export default function App(){
  </div></main>
  {modal==='tx'&&<TxModal item={edit} close={()=>setModal('')} save={saveTx}/>}
  {modal==='work'&&<WorkModal rate={settings.default_hourly_rate} close={()=>setModal('')} save={saveWork}/>}
- {modal==='slip'&&edit&&<SlipModal item={edit} close={()=>{setModal('');setEdit(null)}} save={async v=>{try{await window.cheshbon.payslips.update({...v,id:edit.id});setModal('');setEdit(null);notify('פרטי התלוש נשמרו');refresh()}catch(e){notify(e.message)}}} notify={notify}/>}
+ {modal==='slip'&&edit&&<SlipModal item={edit} close={()=>{setModal('');setEdit(null)}} save={async v=>{try{await window.cheshbon.payslips.update({...v,id:edit.id});setModal('');setEdit(null);notify('פרטי התלוש נשמרו');await refresh()}catch(e){notify(e.message)}}} notify={notify}/>}
  {toast&&<div className="toast"><Check size={17}/>{toast}</div>}{busy&&<div className="loading"><div className="spinner"/>טוען נתונים מקומיים...</div>}
  </div>
 }
