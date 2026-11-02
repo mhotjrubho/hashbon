@@ -44,7 +44,10 @@ function amount(value, allowZero = false) {
 }
 function date(value) {
   const s = text(value, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || Number.isNaN(Date.parse(s + 'T12:00:00'))) throw new Error('תאריך לא תקין');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) throw new Error('תאריך לא תקין');
+  const [y,m,d] = s.split('-').map(Number);
+  const check = new Date(y,m-1,d);
+  if (check.getFullYear() !== y || check.getMonth() !== m-1 || check.getDate() !== d) throw new Error('תאריך לא תקין');
   return s;
 }
 function initDatabase() {
@@ -142,11 +145,30 @@ ipcMain.handle('transactions:add', (_e, item = {}) => {
 ipcMain.handle('transactions:update', (_e, item = {}) => {
   const id = validId(item.id);
   if (!['income','expense','reimbursement'].includes(item.type)) throw new Error('סוג תנועה לא תקין');
+  const title = text(item.title,120);
+  if (!title) throw new Error('חובה להזין תיאור לתנועה');
+  if (!rows('SELECT id FROM transactions WHERE id=?',[id]).length) throw new Error('התנועה לא נמצאה');
   db.run('UPDATE transactions SET type=?,title=?,amount=?,category=?,transaction_date=?,notes=?,related_expense_id=? WHERE id=?', [
-    item.type,text(item.title,120),amount(item.amount),text(item.category,60)||'כללי',date(item.transaction_date),text(item.notes,1000),
+    item.type,title,amount(item.amount),text(item.category,60)||'כללי',date(item.transaction_date),text(item.notes,1000),
     item.related_expense_id ? validId(item.related_expense_id) : null,id
   ]);
   saveDatabase(); return { success: true };
+});
+ipcMain.handle('transactions:export', async (_e, filters = {}) => {
+  const clauses = [];
+  const params = [];
+  if (filters.type && ['income','expense','reimbursement'].includes(filters.type)) { clauses.push('type=?'); params.push(filters.type); }
+  if (filters.month && /^\d{4}-\d{2}$/.test(String(filters.month))) { clauses.push("substr(transaction_date,1,7)=?"); params.push(String(filters.month)); }
+  if (filters.search) { clauses.push('(title LIKE ? OR category LIKE ? OR notes LIKE ?)'); const q='%' + text(filters.search,100) + '%'; params.push(q,q,q); }
+  const data=rows('SELECT transaction_date,title,category,type,amount,notes FROM transactions '+(clauses.length?'WHERE '+clauses.join(' AND '):'')+' ORDER BY transaction_date DESC,id DESC',params);
+  const picked=await dialog.showSaveDialog(mainWindow,{title:'ייצוא תנועות לקובץ CSV',defaultPath:'hashbon-transactions.csv',filters:[{name:'קובץ CSV',extensions:['csv']}]});
+  if(picked.canceled||!picked.filePath)return {canceled:true};
+  const headers=['תאריך','תיאור','קטגוריה','סוג','סכום','הערות'];
+  const labels={income:'הכנסה',expense:'הוצאה',reimbursement:'החזר'};
+  const cell=value=>'"'+String(value??'').replace(/"/g,'""')+'"';
+  const lines=[headers,...data.map(x=>[x.transaction_date,x.title,x.category,labels[x.type]||x.type,x.amount,x.notes])].map(row=>row.map(cell).join(','));
+  fs.writeFileSync(picked.filePath,'\uFEFF'+lines.join('\r\n'),'utf8');
+  return {success:true,path:picked.filePath,count:data.length};
 });
 ipcMain.handle('transactions:remove', (_e, id) => {
   db.run('DELETE FROM transactions WHERE id=?', [validId(id)]); saveDatabase(); return { success: true };
@@ -183,12 +205,18 @@ ipcMain.handle('payslips:import', async () => {
   return rows('SELECT id,file_name,pay_month,employer,gross,net FROM payslips WHERE id=?',[id])[0];
 });
 ipcMain.handle('payslips:update', (_e, item = {}) => {
+  const id = validId(item.id);
+  const payMonth = text(item.pay_month,7);
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(payMonth)) throw new Error('יש לבחור חודש תלוש תקין');
+  const exists = rows('SELECT id FROM payslips WHERE id=?',[id])[0];
+  if (!exists) throw new Error('התלוש לא נמצא. ייתכן שהוא נמחק');
   db.run('UPDATE payslips SET pay_month=?,employer=?,gross=?,net=?,tax=?,national_insurance=?,health_insurance=?,pension=?,hours=?,notes=? WHERE id=?', [
-    text(item.pay_month,7),text(item.employer,120),amount(item.gross||0,true),amount(item.net||0,true),amount(item.tax||0,true),
+    payMonth,text(item.employer,120),amount(item.gross||0,true),amount(item.net||0,true),amount(item.tax||0,true),
     amount(item.national_insurance||0,true),amount(item.health_insurance||0,true),amount(item.pension||0,true),amount(item.hours||0,true),
-    text(item.notes,1000),validId(item.id)
+    text(item.notes,1000),id
   ]);
-  saveDatabase(); return {success:true};
+  saveDatabase();
+  return {success:true, payslip:rows('SELECT id,file_name,pay_month,employer,gross,net,tax,national_insurance,health_insurance,pension,hours,notes FROM payslips WHERE id=?',[id])[0]};
 });
 ipcMain.handle('payslips:remove', (_e,id) => {
   const found = rows('SELECT file_path FROM payslips WHERE id=?',[validId(id)])[0];

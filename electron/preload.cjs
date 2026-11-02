@@ -6,7 +6,8 @@ contextBridge.exposeInMainWorld('cheshbon', {
     list: (filters) => ipcRenderer.invoke('transactions:list', filters),
     add: (data) => ipcRenderer.invoke('transactions:add', data),
     update: (data) => ipcRenderer.invoke('transactions:update', data),
-    remove: (id) => ipcRenderer.invoke('transactions:remove', id)
+    remove: (id) => ipcRenderer.invoke('transactions:remove', id),
+    export: (filters) => ipcRenderer.invoke('transactions:export', filters)
   },
   work: {
     list: (filters) => ipcRenderer.invoke('work:list', filters),
