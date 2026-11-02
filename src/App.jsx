@@ -1,6 +1,6 @@
 import {useEffect,useState} from 'react';
-import {LayoutDashboard,ArrowLeftRight,BriefcaseBusiness,FileText,PieChart,Settings,Wallet,TrendingUp,TrendingDown,ReceiptText,Plus,Search,CalendarDays,ShieldCheck,Trash2,Pencil,Upload,Download,RefreshCw,Timer,Banknote,Check,X,ExternalLink} from 'lucide-react';
-const nav=[['dashboard','סקירה כללית',LayoutDashboard],['transactions','תנועות כספיות',ArrowLeftRight],['work','שעות עבודה',BriefcaseBusiness],['payslips','תלושי שכר',FileText],['reports','דוחות וסיכומים',PieChart],['settings','הגדרות וגיבוי',Settings]];
+import {LayoutDashboard,ArrowLeftRight,BriefcaseBusiness,FileText,PieChart,Settings as SettingsIcon,Wallet,TrendingUp,TrendingDown,ReceiptText,Plus,Search,CalendarDays,ShieldCheck,Trash2,Pencil,Upload,Download,RefreshCw,Timer,Banknote,Check,X,ExternalLink} from 'lucide-react';
+const nav=[['dashboard','סקירה כללית',LayoutDashboard],['transactions','תנועות כספיות',ArrowLeftRight],['work','שעות עבודה',BriefcaseBusiness],['payslips','תלושי שכר',FileText],['reports','דוחות וסיכומים',PieChart],['settings','הגדרות וגיבוי',SettingsIcon]];
 const money=v=>new Intl.NumberFormat('he-IL',{style:'currency',currency:'ILS',maximumFractionDigits:2}).format(Number(v||0));
 const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
 const thisMonth=()=>today().slice(0,7);
