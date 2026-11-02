@@ -1,0 +1,1 @@
+קובצי הרישוי של התלויות הישירות מפורטים ב-THIRD-PARTY-NOTICES.md. לאחר npm install ניתן לעיין ברישיון המדויק של כל גרסה בתיקיית node_modules/<package>/LICENSE או בקובץ רישוי מקביל.
