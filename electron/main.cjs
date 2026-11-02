@@ -142,8 +142,11 @@ ipcMain.handle('transactions:add', (_e, item = {}) => {
 ipcMain.handle('transactions:update', (_e, item = {}) => {
   const id = validId(item.id);
   if (!['income','expense','reimbursement'].includes(item.type)) throw new Error('סוג תנועה לא תקין');
+  const title = text(item.title,120);
+  if (!title) throw new Error('חובה להזין תיאור לתנועה');
+  if (!rows('SELECT id FROM transactions WHERE id=?',[id]).length) throw new Error('התנועה לא נמצאה');
   db.run('UPDATE transactions SET type=?,title=?,amount=?,category=?,transaction_date=?,notes=?,related_expense_id=? WHERE id=?', [
-    item.type,text(item.title,120),amount(item.amount),text(item.category,60)||'כללי',date(item.transaction_date),text(item.notes,1000),
+    item.type,title,amount(item.amount),text(item.category,60)||'כללי',date(item.transaction_date),text(item.notes,1000),
     item.related_expense_id ? validId(item.related_expense_id) : null,id
   ]);
   saveDatabase(); return { success: true };
@@ -183,12 +186,18 @@ ipcMain.handle('payslips:import', async () => {
   return rows('SELECT id,file_name,pay_month,employer,gross,net FROM payslips WHERE id=?',[id])[0];
 });
 ipcMain.handle('payslips:update', (_e, item = {}) => {
+  const id = validId(item.id);
+  const payMonth = text(item.pay_month,7);
+  if (!/^\\d{4}-(0[1-9]|1[0-2])$/.test(payMonth)) throw new Error('יש לבחור חודש תלוש תקין');
+  const exists = rows('SELECT id FROM payslips WHERE id=?',[id])[0];
+  if (!exists) throw new Error('התלוש לא נמצא. ייתכן שהוא נמחק');
   db.run('UPDATE payslips SET pay_month=?,employer=?,gross=?,net=?,tax=?,national_insurance=?,health_insurance=?,pension=?,hours=?,notes=? WHERE id=?', [
-    text(item.pay_month,7),text(item.employer,120),amount(item.gross||0,true),amount(item.net||0,true),amount(item.tax||0,true),
+    payMonth,text(item.employer,120),amount(item.gross||0,true),amount(item.net||0,true),amount(item.tax||0,true),
     amount(item.national_insurance||0,true),amount(item.health_insurance||0,true),amount(item.pension||0,true),amount(item.hours||0,true),
-    text(item.notes,1000),validId(item.id)
+    text(item.notes,1000),id
   ]);
-  saveDatabase(); return {success:true};
+  saveDatabase();
+  return {success:true, payslip:rows('SELECT id,file_name,pay_month,employer,gross,net,tax,national_insurance,health_insurance,pension,hours,notes FROM payslips WHERE id=?',[id])[0]};
 });
 ipcMain.handle('payslips:remove', (_e,id) => {
   const found = rows('SELECT file_path FROM payslips WHERE id=?',[validId(id)])[0];
